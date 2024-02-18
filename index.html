@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TSS Web Demo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="wasm_exec.js"></script>
+    <script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <form class="border m-3 p-3">
+        <div class="mb-3 row">
+            <label for="fileInput1" class="col-sm-2 col-form-label">密钥分片1</label>
+            <div class="col-sm-10">
+                <div class="custom-file">
+                    <input type="file" class="custom-file-input" id="fileInput1">
+                    <label class="custom-file-label" for="fileInput1" id="fileInput1Label">请上传密钥分片1</label>
+                </div>
+            </div>
+        </div>
+        <div class="mb-3 row ">
+            <label for="fileInput2" class="col-sm-2 col-form-label">密钥分片2</label>
+            <div class="col-sm-10">
+                <div class="custom-file">
+                    <input type="file" class="custom-file-input" id="fileInput2">
+                    <label class="custom-file-label" for="fileInput1" id="fileInput2Label">请上传密钥分片2</label>
+                </div>
+            </div>
+        </div>
+    </form>
+    <form class="border m-3 p-3">
+        <div class="mb-3 row">
+            <label for="inputMsg" class="col-sm-2 col-form-label">待签名信息</label>
+            <div class="col-sm-10">
+                <input type="text" class="form-control" id="inputMsg">
+            </div>
+        </div>
+        <div class="mb-3">
+            <button id="signBtn" type="button" class="btn btn-primary">签名
+                <span id="signBtnStatus" class="spinner-border spinner-border-sm" role="status" style="display: none;"></span>
+            </button>
+        </div>
+        <div class="mb-3">
+            <label for="signResult" class="form-label">签名结果</label>
+            <textarea class="form-control" id="signResult" rows="3"></textarea>
+        </div>
+    </form>
+    <form class="border m-3 p-3">
+        <div class="mb-3">
+            <button id="viewBtn" type="button" class="btn btn-info">查看钱包信息</button>
+        </div>
+        <div class="mb-3 row">
+            <label for="walletAddress" class="col-sm-2 col-form-label">钱包地址</label>
+            <div class="col-sm-10">
+                <input type="text" readonly class="form-control-plaintext" id="walletAddress">
+            </div>
+        </div>
+        <div class="mb-3 row">
+            <label for="walletPriKey" class="col-sm-2 col-form-label">钱包私钥</label>
+            <div class="col-sm-10">
+                <input type="text" readonly class="form-control-plaintext" id="walletPriKey">
+            </div>
+        </div>
+    </form>
+</div>
+<div class="modal fade" id="alertModal" tabindex="-1" aria-labelledby="alertModalLabel"
+     aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="alertModalLabel">警告</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="alertModalBody">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const go = new Go();
+    WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then((result) => {
+        go.run(result.instance);
+        console.log('Key value is ', keyNum)
+    });
+
+
+    let partyNo1;
+    let fileKey1Bytes;
+    let partyNo2;
+    let fileKey2Bytes;
+
+    function signAction() {
+        if (!fileKey1Bytes || !fileKey2Bytes) {
+            $("#alertModalBody").text("请上传密钥分片");
+            $('#alertModal').modal('show')
+            return;
+        }
+        let inputMsg = $("#inputMsg").val();
+        if (!inputMsg) {
+            $("#alertModalBody").text("请输入待签名的信息");
+            $('#alertModal').modal('show')
+            return;
+        }
+
+        $("#signBtnStatus").show();
+        let signResult = sign(partyNo1, fileKey1Bytes, partyNo2, fileKey2Bytes, inputMsg);
+        console.log("-----> Sign finish, result : ", signResult)
+        $("#signBtnStatus").hide();
+        if (signResult) {
+            $('#signResult').val(signResult)
+        }
+    }
+
+    function parseKeyAction() {
+        if (!fileKey1Bytes || !fileKey2Bytes) {
+            $("#alertModalBody").text("请上传密钥分片");
+            $('#alertModal').modal('show')
+            return;
+        }
+
+        let addrAndPriKey = parseKey(fileKey1Bytes, fileKey2Bytes);
+        if (addrAndPriKey) {
+            $('#walletAddress').val(addrAndPriKey[0])
+            $('#walletPriKey').val(addrAndPriKey[1])
+        }
+    }
+
+    $(document).ready(function () {
+        $("#signBtn").click(function () {
+            console.log('Sign button is clicked')
+            signAction();
+        });
+
+        $("#viewBtn").click(function () {
+            console.log('Parse key button is clicked')
+            parseKeyAction();
+        });
+    });
+
+    window.onload = function (e) {
+        document.getElementById('fileInput1')
+            .addEventListener('change', function selectedFileChanged() {
+                if (this.files.length === 0) {
+                    console.log('请选择文件！');
+                    return;
+                }
+
+                if (this.files[0].name) {
+                    $("#fileInput1Label").text(this.files[0].name);
+                    partyNo1 = parseInt(this.files[0].name.substring(3))
+                }
+                const reader = new FileReader();
+                reader.onload = function fileReadCompleted() {
+                    fileKey1Bytes = new Uint8Array(reader.result);
+                };
+                reader.readAsArrayBuffer(this.files[0]);
+            });
+
+        document.getElementById('fileInput2')
+            .addEventListener('change', function selectedFileChanged() {
+                if (this.files.length === 0) {
+                    console.log('请选择文件！');
+                    return;
+                }
+
+                if (this.files[0].name) {
+                    $("#fileInput2Label").text(this.files[0].name);
+                    partyNo2 = parseInt(this.files[0].name.substring(3))
+                }
+                const reader = new FileReader();
+                reader.onload = function fileReadCompleted() {
+                    fileKey2Bytes = new Uint8Array(reader.result);
+                };
+                reader.readAsArrayBuffer(this.files[0]);
+            });
+    }
+</script>
+</body>
+</html>
