@@ -1,6 +1,6 @@
 module tss-web
 
-go 1.18
+go 1.21
 
 require github.com/bnb-chain/tss-lib v1.5.0
 

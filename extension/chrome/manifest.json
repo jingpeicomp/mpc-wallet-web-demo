@@ -1,0 +1,40 @@
+{
+    "name": "VVWallet",
+    "description": "VVWallet MPC Extension",
+    "version": "1.0.0",
+    "manifest_version": 3,
+    "permissions": [
+        "storage",
+        "activeTab",
+        "scripting",
+        "webRequest"
+    ],
+    "action": {
+        "default_popup": "index.html",
+        "default_icon": {
+            "16": "vvwallet.png",
+            "32": "vvwallet.png",
+            "48": "vvwallet.png",
+            "128": "vvwallet.png"
+        }
+    },
+    "icons": {
+        "16": "vvwallet.png",
+        "32": "vvwallet.png",
+        "48": "vvwallet.png",
+        "128": "vvwallet.png"
+    },
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "main.wasm"
+            ],
+            "matches": [
+                "https://*.vvwallet.io/*"
+            ]
+        }
+    ],
+    "content_security_policy": {
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+    }
+}

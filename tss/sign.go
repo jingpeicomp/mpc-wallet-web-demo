@@ -7,8 +7,6 @@
 package tss
 
 import (
-	"bytes"
-	"encoding/gob"
 	"encoding/hex"
 	"github.com/bnb-chain/tss-lib/common"
 	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
@@ -20,12 +18,12 @@ import (
 	"strconv"
 )
 
-func Sign(msg string, partyNo1 int, key1Bytes []byte, partyNo2 int, key2Bytes []byte) string {
-	log.Printf("go start sign partyNo1: %v  partyNo2:%v msg: %v", partyNo1, partyNo2, msg)
+func Sign(msg string, partyNo1 int, key1 keygen.LocalPartySaveData, partyNo2 int, key2 keygen.LocalPartySaveData) string {
+	log.Printf("go start sign msg: %v", msg)
 	outCh := make(chan tss.Message)
 	endCh := make(chan common.SignatureData)
 	msgDigest := []byte(msg)
-	parties := loadPartyByBytes(msgDigest, outCh, endCh, partyNo1, key1Bytes, partyNo2, key2Bytes)
+	parties := loadPartyByBytes(msgDigest, outCh, endCh, partyNo1, key1, partyNo2, key2)
 	partyMap := make(map[string]tss.Party)
 	partyMap[parties[0].PartyID().Id] = parties[0]
 	partyMap[parties[1].PartyID().Id] = parties[1]
@@ -60,14 +58,13 @@ signing:
 		}
 	}
 
-	//result := append(signData.GetSignatureRecovery(), signData.GetSignature()...)
-	//return string(result)
 	result := hex.EncodeToString(signData.GetSignatureRecovery()) + hex.EncodeToString(signData.GetS()) + hex.EncodeToString(signData.GetR())
 	log.Println("Sign result ", result)
 	return result
 }
 
-func loadPartyByBytes(digest []byte, outCh chan tss.Message, endCh chan common.SignatureData, index1 int, keyBytes1 []byte, index2 int, keyBytes2 []byte) [2]tss.Party {
+func loadPartyByBytes(digest []byte, outCh chan tss.Message, endCh chan common.SignatureData, index1 int,
+	key1 keygen.LocalPartySaveData, index2 int, key2 keygen.LocalPartySaveData) [2]tss.Party {
 	parties := tss.SortPartyIDs(tss.UnSortedPartyIDs{tss.NewPartyID(strconv.Itoa(index1), " ", big.NewInt(int64(index1))),
 		tss.NewPartyID(strconv.Itoa(index2), " ", big.NewInt(int64(index2)))})
 
@@ -77,25 +74,14 @@ func loadPartyByBytes(digest []byte, outCh chan tss.Message, endCh chan common.S
 	msg.SetBytes(digest)
 
 	partyId1 := parties[0]
+	log.Println("Core ", runtime.GOMAXPROCS(0))
 	params1 := tss.NewParameters(curve, ctx, partyId1, 3, 1)
-	var key1 keygen.LocalPartySaveData
-	buf1 := bytes.NewBuffer(keyBytes1)
-	dec1 := gob.NewDecoder(buf1)
-	err1 := dec1.Decode(&key1)
-	if err1 != nil {
-		log.Println("Cannot decode key ", err1)
-	}
+	params1.SetConcurrency(4)
 	party1 := signing.NewLocalParty(msg, params1, key1, outCh, endCh)
 
 	partyId2 := parties[1]
 	params2 := tss.NewParameters(curve, ctx, partyId2, 3, 1)
-	var key2 keygen.LocalPartySaveData
-	buf2 := bytes.NewBuffer(keyBytes2)
-	dec2 := gob.NewDecoder(buf2)
-	err2 := dec2.Decode(&key2)
-	if err2 != nil {
-		log.Println("Cannot decode key ", err2)
-	}
+	params2.SetConcurrency(4)
 	party2 := signing.NewLocalParty(msg, params2, key2, outCh, endCh)
 
 	return [2]tss.Party{party1, party2}
@@ -105,9 +91,9 @@ func startParty(parties [2]tss.Party) {
 	for _, party := range parties {
 		currentParty := party
 		go func() {
+			log.Println("------> start party begin: ", currentParty.PartyID().Id)
 			err := currentParty.Start()
 			if err == nil {
-				log.Println()
 				log.Println("------> start party successfully: ", currentParty.PartyID().Id)
 			} else {
 				log.Println("------> start party error: ", currentParty.PartyID().Id, err)
@@ -118,7 +104,7 @@ func startParty(parties [2]tss.Party) {
 
 func partyUpdate(party tss.Party, msg tss.Message) {
 	// do not send a message from this party back to itself
-	log.Printf("Party id: %v , message from: %v , message destination %v", party.PartyID().Id, msg.GetFrom().Id, msg.GetTo())
+	log.Printf("Party id: %v , message from: %v , message destination %v , broadcast %v", party.PartyID().Id, msg.GetFrom().Id, msg.GetTo(), msg.IsBroadcast())
 	if party.PartyID().Id == msg.GetFrom().Id {
 		return
 	}

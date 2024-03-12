@@ -1,11 +1,10 @@
 package tss
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"encoding/gob"
 	"encoding/hex"
+	"encoding/json"
 	"github.com/bnb-chain/tss-lib/crypto/vss"
 	"github.com/bnb-chain/tss-lib/ecdsa/keygen"
 	"github.com/bnb-chain/tss-lib/tss"
@@ -13,9 +12,9 @@ import (
 	"log"
 )
 
-func ParseKey(key1Bytes []byte, key2Bytes []byte) [2]string {
-	keyData1 := loadPartyDataByBytes(key1Bytes)
-	keyData2 := loadPartyDataByBytes(key2Bytes)
+func ParseKeyByBytes(key1Bytes []byte, key2Bytes []byte) [2]string {
+	keyData1 := LoadPartyDataByBytes(key1Bytes)
+	keyData2 := LoadPartyDataByBytes(key2Bytes)
 	priKey, _ := reconstruct(1, tss.S256(), [2]keygen.LocalPartySaveData{keyData1, keyData2})
 	log.Println("Private Key: ", priKey.PublicKey)
 	addr := crypto.PubkeyToAddress(priKey.PublicKey).String()
@@ -24,13 +23,20 @@ func ParseKey(key1Bytes []byte, key2Bytes []byte) [2]string {
 	return [2]string{addr, strPriKey}
 }
 
-func loadPartyDataByBytes(keyBytes []byte) keygen.LocalPartySaveData {
+func ParseKey(keyData1 keygen.LocalPartySaveData, keyData2 keygen.LocalPartySaveData) [2]string {
+	priKey, _ := reconstruct(1, tss.S256(), [2]keygen.LocalPartySaveData{keyData1, keyData2})
+	log.Println("Private Key: ", priKey.PublicKey)
+	addr := crypto.PubkeyToAddress(priKey.PublicKey).String()
+	strPriKey := hex.EncodeToString(priKey.D.Bytes())
+	log.Printf("Wallet address is %v , private key is %v", addr, strPriKey)
+	return [2]string{addr, strPriKey}
+}
+
+func LoadPartyDataByBytes(keyBytes []byte) keygen.LocalPartySaveData {
 	var key keygen.LocalPartySaveData
-	buf := bytes.NewBuffer(keyBytes)
-	dec := gob.NewDecoder(buf)
-	err2 := dec.Decode(&key)
-	if err2 != nil {
-		log.Println("Cannot decode key ", err2)
+	err := json.Unmarshal(keyBytes, &key)
+	if err != nil {
+		log.Println("Cannot decode key ", err)
 	}
 
 	return key
