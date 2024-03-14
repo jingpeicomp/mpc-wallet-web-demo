@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>TSS Web Demo</title>
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/4.6.2/css/bootstrap.min.css" rel="stylesheet">
-<!--    <script src="wasm_exec.js"></script>-->
-    <script src="wasm_exec-tinygo.js"></script>
+    <script src="wasm_exec.js"></script>
+<!--    <script src="wasm_exec-tinygo.js"></script>-->
     <script src="https://cdn.bootcdn.net/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
     <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/4.6.2/js/bootstrap.bundle.min.js"></script>
 </head>
@@ -94,7 +94,7 @@
 
 <script>
     const go = new Go();
-    WebAssembly.instantiateStreaming(fetch("wasm.wasm"), go.importObject).then((result) => {
+    WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then((result) => {
         go.run(result.instance);
         console.log('Key value is ', keyNum)
     });
